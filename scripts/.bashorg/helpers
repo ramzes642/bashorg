@@ -1,0 +1,52 @@
+#!/bin/bash
+
+function b_install() {
+    apt-get install -y $1
+}
+
+function b_prompt() {
+    dialog --ascii-lines --yesno "$1" 0 0
+}
+
+function b_uses() {
+    for p in $*
+    do
+    which $p >> /dev/null
+    if [ $? != 0 ]
+    then
+	b_prompt "Install $p?" && b_install $p
+	if [ $? != 0 ]
+	then
+	    exit
+	fi
+    fi
+    done
+}
+
+
+function b_pv() {
+    b_uses pv
+    trap "rm -f /tmp/pvdata /tmp/pvstat" 0 1 2 5 15
+
+    mkfifo /tmp/data
+    pv -i 0.25 -n "$1" 2>&1 1> /tmp/pvdata | (
+    PVPID=$!
+    pv -peta -d $PVPID > /tmp/pvstat 2>&1 &
+    while read size
+    do
+	echo $size
+	echo XXX
+	echo Progress:
+	cat /tmp/pvstat | tr "\r" "\n" | sed -rn 's/.*?: (.*\[.*s\]).*(ETA .*)/\1 \2/p' | tail -n 1
+	echo `basename $1`
+	echo XXX
+    done
+    ) | dialog --ascii-lines --gauge "Running please wait..." 10 70 0 1>&2 &
+    cat /tmp/pvdata
+    rm /tmp/pvdata
+    rm /tmp/pvstat
+}
+
+
+#b_pv /home/mbackup/files/27.02.2017/mixupload-db-27.02.2017-00-00.sql | md5sum
+

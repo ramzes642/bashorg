@@ -1,0 +1,80 @@
+#!/bin/bash
+
+
+which dialog >> /dev/null
+if [ $? != 0 ]
+then
+    echo "Dialog not found"
+    echo "Any key to install, Ctrl+C to exit"
+    read -n 1
+    apt-get install dialog
+fi
+
+choice=`mktemp 2>/dev/null` || choice=/tmp/test$$
+trap "rm -f $choice" 0 1 2 5 15
+
+BASHORG=`realpath $0`
+BASHORGDIR=`dirname $BASHORG`
+BASHORGSCRIPTS=$BASHORGDIR/scripts
+declare -x BASHORGHELPERS=$BASHORGDIR/scripts/.bashorg/helpers
+
+echo $BASHORGDIR
+#cd $BASHORGDIR
+
+
+function menu() {
+    DIR=$BASHORGDIR/$1
+
+    OPTS=()
+    for item in `ls $DIR | sort`
+    do
+
+	    if [ -d $DIR/$item ]
+	    then
+		if [ -e $DIR/$item/.menu ]
+		then
+		    DESC=`cat $DIR/$item/.menu`
+		else
+		    DESC="No description"
+		fi
+	    else
+		DESC=`cat $DIR/$item | sed -rn 's/# Description: (.*)/\1/p'`
+	    fi
+	OPTS=($item "${DESC}" ${OPTS[@]})
+    done
+    echo $OPTS
+    dialog --ascii-lines --clear --title "Bashorg" --menu `basename $DIR` 24 60 24 "${OPTS[@]}" 2> $choice
+    retval=$?
+}
+
+menudir=scripts
+while true
+do
+
+menu $menudir
+case $retval in
+    0)
+	if [ -d $BASHORGDIR/$menudir/`cat $choice` ]
+	then
+	    menudir=$menudir/`cat $choice`
+	else
+	    echo Running script: $BASHORGDIR/$menudir/`cat $choice` $*
+	    $BASHORGDIR/$menudir/`cat $choice` $*
+	    if [ $? != 0 ]
+	    then
+		read -n 1
+	    fi
+	    sleep 5
+	fi
+    ;;
+    1|255)
+	if [ $menudir = "scripts" ]
+	then
+	    exit
+	else
+	    menudir=`dirname $menudir`
+	fi
+    ;;
+esac
+
+done

@@ -1,0 +1,12 @@
+#!/bin/bash
+# Description: Splitting dump by tables
+# Args: file
+
+echo $BASHORGHELPERS
+. $BASHORGHELPERS
+
+
+echo Splitting dump by tables
+b_pv $1 | csplit - '/^-- Table structure/' '{*}'
+
+exit 1
